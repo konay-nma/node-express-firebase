@@ -32,44 +32,6 @@ app.get('/hello', (req, res, next) => {
     res.send("Welcome")
 })
 
-// get method for getting movie data 
-
-app.get('/moviesapi', (req, res, nex) => {
-    console.info('GET /moviesapi')
-    let ref = db.ref()
-    // Attach an asynchronous callback to read the data
-    ref.on("value", snapshot => {
-        const result = []
-        const movies = []
-        let values;
-
-        snapshot.forEach(childNodes => {
-            if (childNodes.key === 'movies') {
-                values = childNodes.val()
-                for (let [key, value] of Object.entries(values)) {
-                    movies.push(
-                        value
-                    )
-                }
-                result.push({ [childNodes.key]: movies.reverse() })
-            } else
-                if (childNodes.key === 'categories') {
-                    result.push({ [childNodes.key]: childNodes.val() })
-                }
-        })
-        // for (let [key, value] of Object.entries(values)) {
-        //     result.push(
-        //         key,
-        //         ...value
-        //     )
-        // }
-
-        return res.status(200).json(result)
-    }, err => res.status(500).json({ error: err.code }))
-
-}, err => res.status(500).json({ error: err.code }))
-
-// start of admin log in auth server
 app.post('/adminLogin', (req, res, next) => {
     console.info('POST /adminLogin')
     //fake user for admin log in test
@@ -91,6 +53,42 @@ app.post('/adminLogin', (req, res, next) => {
     }
 
 }) // end of the admin log in auth server
+
+// get method for getting movie data READ
+app.get('/moviesapi', (req, res, nex) => {
+    console.info('GET /moviesapi')
+    let ref = db.ref()
+    // Attach an asynchronous callback to read the data
+    ref.on("value", snapshot => {
+        const result = []
+        const movies = []
+        const series = []
+
+        snapshot.forEach(childNodes => {
+            const key = childNodes.key
+            const values = childNodes.val()
+            if (key === 'movies') {
+                
+                for (let [key, value] of Object.entries(values)) {
+                    movies.push(value)
+                }
+                result.push({ [key]: movies.reverse() })
+            } else if (key === 'categories') {
+                result.push({ [key]: childNodes.val() })
+            } else if (key === 'series') {
+                for (let [key, value] of Object.entries(values)) {
+                    series.push(value)
+                }
+                result.push({ [key]: series.reverse() })
+            }
+        })
+
+        return res.status(200).json(result)
+    }, err => res.status(500).json({ error: err.code }))
+
+}, err => res.status(500).json({ error: err.code }))
+
+// start of admin log in auth server
 
 // post data to firebase real time database //session
 
@@ -124,9 +122,24 @@ app.post('/movies', (req, res, next) => {
 
 })
 
+app.post('/series', (req, res, next) => {
+    console.log('POST /series')
+    const postData = req.body
+    const seriesRef = db.ref('/series')
+
+    seriesRef.push(postData)
+        .then(snap => {
+            return res.status(200).json({ messagge: 'Add Successfully', key: snap.key })
+        })
+        .catch(err => {
+            return res.status(500).json({ error: err })
+        })
+
+})
+
 //catch 404
 app.use((req, res, next) => {
-    const err = new Error('Not Fount')
+    const err = new Error('Not Found')
     err.status = 404
     next(err)
 })
