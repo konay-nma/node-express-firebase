@@ -68,7 +68,6 @@ app.get('/moviesapi', (req, res, nex) => {
             const key = childNodes.key
             const values = childNodes.val()
             if (key === 'movies') {
-                
                 for (let [key, value] of Object.entries(values)) {
                     movies.push(value)
                 }
