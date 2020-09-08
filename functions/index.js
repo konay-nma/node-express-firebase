@@ -26,6 +26,7 @@ admin.initializeApp({
 
 // gettin the db from database 
 const db = admin.database()
+const ref = db.ref()
 
 app.get('/hello', (req, res, next) => {
     console.info('GET /hello success')
@@ -57,13 +58,11 @@ app.post('/adminLogin', (req, res, next) => {
 // get method for getting movie data READ
 app.get('/moviesapi', (req, res, nex) => {
     console.info('GET /moviesapi')
-    let ref = db.ref()
-    // Attach an asynchronous callback to read the data
+    // Attach an asynchronous callback to read the data & ref is globle declaration
     ref.on("value", snapshot => {
         const result = []
         const movies = []
         const series = []
-
         snapshot.forEach(childNodes => {
             const key = childNodes.key
             const values = childNodes.val()
@@ -95,45 +94,85 @@ app.post('/movies', (req, res, next) => {
     console.info('POST /movies')
     //const {title, image} = req.body // creating the post data 
     const postData = req.body
-    if (!postData.title || !postData.image) return res.status(400).send('Missing data')
+    if (!postData.title || !postData.image || !postData.movie_id) return res.status(400).json({ message: 'Missing data' })
 
     const rawCategories = []
-    let ref = db.ref('/movies')
-    let catRef = db.ref('/categories')
-    ref.push(postData)
-        .then(snap => {
-            ref.once("value", snapshot => {
-                snapshot.forEach(childNodes => {
-                    rawCategories.push(childNodes.val().title)
-                })
-                let categories = []
-                categories = rawCategories.filter((item, index) => rawCategories.indexOf(item) === index)
+    const movieRef = db.ref('/movies')
+    const catRef = db.ref('/categories')
 
+    movieRef.push(postData)
+        .then(snap => {
+            movieRef.once("value", snapshot => {
+                snapshot.forEach(childNodes => {
+                    rawCategories.push(childNodes.val().category)
+                })
+
+                const categories = rawCategories.filter((item, index) => rawCategories.indexOf(item) === index)
                 catRef.set(categories) // setting new categories ref in database 
             })
-
-            return res.json({ message: 'Add Successfully', key: snap.key })
+            return res.status(200).json({ message: 'Add Successfully', key: snap.key })
         })
         .catch(err => {
-            return res.status(500).json({ error: err })
+            return res.status(500).json({ message: err })
         })
-
-
 })
-
+//create series data
 app.post('/series', (req, res, next) => {
     console.log('POST /series')
     const postData = req.body
-    const seriesRef = db.ref('/series')
+    if (!postData.title || !postData.movie_id || !postData.image) return res.status(400).json({ message: 'Missing data' })
 
+    const seriesRef = db.ref('/series')
     seriesRef.push(postData)
         .then(snap => {
             return res.status(200).json({ messagge: 'Add Successfully', key: snap.key })
         })
         .catch(err => {
-            return res.status(500).json({ error: err })
+            return res.status(500).json({ message: err })
         })
+})
 
+//updatae and fix data
+app.put('/update', (req, res, next) => {
+    console.log('PUT /update')
+    const putData = req.body
+    if (!putData.title || !putData.movie_id) return res.status(400).json({ message: 'Missing data' })
+
+    // ref is a global 
+    const updateMovieId = []
+    const rawData = []
+    const movieRef = ref.child('movies')
+    const seriesRef = ref.child('series')
+    let key;
+
+    if (putData.series) {
+        seriesRef.once('value', snapshot => {
+            // const values = snapshot.val()
+            // return res.status(200).send(values)
+            snapshot.forEach(childNodes => {
+                if (childNodes.val().title === putData.title) {
+                    key = childNodes.key
+                    rawData.push(...childNodes.val().movie_id)
+                }
+                // updateData.push(...childNodes.val().image, ...putData.image)
+            })
+            updateMovieId.push(...rawData, ...putData.movie_id)
+            if (!putData.image) {
+                seriesRef.child(key).update({
+                    "image": putData.image,
+                    "movie_id": updateMovieId
+                })
+                return res.status(200).json({ message: "Update Successully", data: updateMovieId })
+            } else {
+                seriesRef.child(key).update({
+                    "movie_id": updateMovieId
+                })
+                return res.status(200).json({ message: "Update Successully", data: updateMovieId })
+            }
+        })
+    } else if (putData.movies) {
+        // TO DO
+    } else return res.status(400).json({ message: 'Something wrong' })
 })
 
 //catch 404
