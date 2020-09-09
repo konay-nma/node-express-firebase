@@ -11,13 +11,6 @@ app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use(bodyParser.json());
 
-// Fetch the service account key JSON file contents
-//const serviceAccount = require('C:/Users/Lenovo/Project/node-express-firebase/functions/nodemcu-thesis-db-firebase-adminsdk-lm0hh-4ddac5316d.json')
-// admin.initializeApp({
-//     credential : admin.credential.cert(serviceAccount),
-//     databaseURL : 'https://nodemcu-thesis-db.firebaseio.com'
-// })
-
 // Initialize the app with a service account, granting admin privileges
 admin.initializeApp({
     credential: admin.credential.applicationDefault(),
@@ -27,6 +20,9 @@ admin.initializeApp({
 // gettin the db from database 
 const db = admin.database()
 const ref = db.ref()
+const movieRef = db.ref('/movies')
+const catRef = db.ref('/categories')
+const seriesRef = db.ref('/series')
 
 app.get('/hello', (req, res, next) => {
     console.info('GET /hello success')
@@ -77,7 +73,7 @@ app.get('/moviesapi', (req, res, nex) => {
                 for (let [key, value] of Object.entries(values)) {
                     series.push(value)
                 }
-                result.push({ [key]: series.reverse() })
+                result.push({ [key]: series})
             }
         })
 
@@ -89,7 +85,6 @@ app.get('/moviesapi', (req, res, nex) => {
 // start of admin log in auth server
 
 // post data to firebase real time database //session
-
 app.post('/movies', (req, res, next) => {
     console.info('POST /movies')
     //const {title, image} = req.body // creating the post data 
@@ -97,39 +92,34 @@ app.post('/movies', (req, res, next) => {
     if (!postData.title || !postData.image || !postData.movie_id) return res.status(400).json({ message: 'Missing data' })
 
     const rawCategories = []
-    const movieRef = db.ref('/movies')
-    const catRef = db.ref('/categories')
-
-    movieRef.push(postData)
-        .then(snap => {
-            movieRef.once("value", snapshot => {
-                snapshot.forEach(childNodes => {
-                    rawCategories.push(childNodes.val().category)
+    
+    if (postData.type === 'movie') {
+        movieRef.push(postData)
+            .then(snap => {
+                movieRef.once("value", snapshot => {
+                    snapshot.forEach(childNodes => {
+                        rawCategories.push(childNodes.val().category)
+                    })
+                    
+                    const categories = rawCategories.filter((item, index) => rawCategories.indexOf(item) === index)
+                    catRef.set(categories) // setting new categories ref in database 
                 })
-
-                const categories = rawCategories.filter((item, index) => rawCategories.indexOf(item) === index)
-                catRef.set(categories) // setting new categories ref in database 
+                //return res.json(categories)
+                return res.status(200).json({ message: 'Add Successfully', key: snap.key })
             })
-            return res.status(200).json({ message: 'Add Successfully', key: snap.key })
-        })
-        .catch(err => {
-            return res.status(500).json({ message: err })
-        })
-})
-//create series data
-app.post('/series', (req, res, next) => {
-    console.log('POST /series')
-    const postData = req.body
-    if (!postData.title || !postData.movie_id || !postData.image) return res.status(400).json({ message: 'Missing data' })
+            .catch(err => {
+                return res.status(500).json({ message: err })
+            })
+    } else {
+        seriesRef.push(postData)
+            .then(snap => {
+                return res.status(200).json({ messagge: 'Add Successfully', key: snap.key })
+            })
+            .catch(err => {
+                return res.status(500).json({ message: err })
+            })
 
-    const seriesRef = db.ref('/series')
-    seriesRef.push(postData)
-        .then(snap => {
-            return res.status(200).json({ messagge: 'Add Successfully', key: snap.key })
-        })
-        .catch(err => {
-            return res.status(500).json({ message: err })
-        })
+    }
 })
 
 //updatae and fix data
@@ -141,8 +131,6 @@ app.put('/update', (req, res, next) => {
     // ref is a global 
     const updateMovieId = []
     const rawData = []
-    const movieRef = ref.child('movies')
-    const seriesRef = ref.child('series')
     let key;
 
     if (putData.series) {
