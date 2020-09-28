@@ -64,7 +64,7 @@ app.get('/moviesapi', (req, res, nex) => {
             const values = childNodes.val()
             if (key === 'movies') {
                 for (let [key, value] of Object.entries(values)) {
-                    movies.push(value)
+                    movies.push({key, ...value})
                 }
                 result.push({ [key]: movies.reverse() })
             } else if (key === 'categories') {
@@ -171,9 +171,8 @@ app.use((req, res, next) => {
 })
 
 app.use((err, req, res, next) => res.status(err.status || 500).send(err.message || 'There was a problem'))
-//this is the test
+
 app.listen(PORT, () => {
     console.log(`server is running at port: ${PORT}`)
 })
-
 exports.app = functions.https.onRequest(app);
