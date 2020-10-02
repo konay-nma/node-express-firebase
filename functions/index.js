@@ -4,6 +4,11 @@ const admin = require('firebase-admin')
 const express = require('express'); // express application 
 const cors = require('cors')
 const bodyParser = require('body-parser');
+
+const fbdown = require('./service/fbdown');
+const { default: Axios } = require('axios');
+const qs = require('qs')
+const htmlParser = require('node-html-parser')
 //const validator = require('email-validator') // to validate email  
 const PORT = 3001;
 const app = express();
@@ -64,7 +69,7 @@ app.get('/moviesapi', (req, res, nex) => {
             const values = childNodes.val()
             if (key === 'movies') {
                 for (let [key, value] of Object.entries(values)) {
-                    movies.push({key, ...value})
+                    movies.push({ key, ...value })
                 }
                 result.push({ [key]: movies.reverse() })
             } else if (key === 'categories') {
@@ -73,7 +78,7 @@ app.get('/moviesapi', (req, res, nex) => {
                 for (let [key, value] of Object.entries(values)) {
                     series.push(value)
                 }
-                result.push({ [key]: series})
+                result.push({ [key]: series })
             }
         })
 
@@ -92,7 +97,7 @@ app.post('/movies', (req, res, next) => {
     if (!postData.title || !postData.image || !postData.movie_id) return res.status(400).json({ message: 'Missing data' })
 
     const rawCategories = []
-    
+
     if (postData.type === 'movie') {
         movieRef.push(postData)
             .then(snap => {
@@ -100,7 +105,7 @@ app.post('/movies', (req, res, next) => {
                     snapshot.forEach(childNodes => {
                         rawCategories.push(childNodes.val().category)
                     })
-                    
+
                     const categories = rawCategories.filter((item, index) => rawCategories.indexOf(item) === index)
                     catRef.set(categories) // setting new categories ref in database 
                 })
@@ -161,6 +166,39 @@ app.put('/update', (req, res, next) => {
     } else if (putData.movies) {
         // TO DO
     } else return res.status(400).json({ message: 'Something wrong' })
+})
+
+//facebook video extract
+app.get('/para', (req, res, next) => {
+    const para = req.query.URLz
+    return res.status(200).send(para)
+})
+app.get('/fbdown', (req, res, next) => {
+   // const data = req.body
+   const URLz = req.query.URLz
+    Axios.post('https://fbdown.net/download.php', qs.stringify({URLz}))
+        .then(response => {
+            const result = response.data
+            const root = htmlParser.parse(result)
+            const sdQuery = root.querySelector('#sdlink')
+            const hdQuery = root.querySelector('#hdlink')
+            const rawVideoData = []
+            sdQuery !== null &&
+                rawVideoData.push(...sdQuery.toString().split(' '))
+            hdQuery !== null &&
+                rawVideoData.push(...hdQuery.toString().split(' '))
+            if (rawVideoData.length === 0) return res.status(200).json({ message: 'Video link not found' })
+
+            const regex = /&amp;/gi // this is important
+
+            let hdlink = null
+            const sdlink = rawVideoData[2].substring(6, rawVideoData[2].length - 1).replace(regex, '&')
+            if (rawVideoData.length > 13)
+                hdlink = rawVideoData[15].substring(6, rawVideoData[15].length - 1).replace(regex, '&')
+            console.log(rawVideoData.length)
+            return res.status(200).json({sdlink, hdlink})
+        })
+        .catch(err => console.log(err))
 })
 
 //catch 404
