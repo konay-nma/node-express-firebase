@@ -8,11 +8,12 @@ const bodyParser = require('body-parser');
 const fbdown = require('./service/fbdown');
 const { default: Axios } = require('axios');
 const qs = require('qs')
-const htmlParser = require('node-html-parser')
+const querystring = require('querystring')
+const htmlParser = require('node-html-parser');
 //const validator = require('email-validator') // to validate email  
 const PORT = 3001;
 const app = express();
-app.use(cors());
+app.use(cors({origin : true}));
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use(bodyParser.json());
 
@@ -169,14 +170,16 @@ app.put('/update', (req, res, next) => {
 })
 
 //facebook video extract
-app.get('/para', (req, res, next) => {
-    const para = req.query.URLz
-    return res.status(200).send(para)
-})
 app.get('/fbdown', (req, res, next) => {
-   // const data = req.body
-   const URLz = req.query.URLz
-    Axios.post('https://fbdown.net/download.php', qs.stringify({URLz}))
+    // const data = req.body
+    const URLz = req.query.URLz
+    Axios.post('https://fbdown.net/download.php',
+        querystring.stringify({ URLz }), {
+        headers: {
+            'Content-Type' : 'application/x-www-form-urlencoded',
+            'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36'
+        }}
+        )
         .then(response => {
             const result = response.data
             const root = htmlParser.parse(result)
@@ -196,7 +199,7 @@ app.get('/fbdown', (req, res, next) => {
             if (rawVideoData.length > 13)
                 hdlink = rawVideoData[15].substring(6, rawVideoData[15].length - 1).replace(regex, '&')
             console.log(rawVideoData.length)
-            return res.status(200).json({sdlink, hdlink})
+            return res.status(200).json({ sdlink, hdlink })
         })
         .catch(err => console.log(err))
 })
